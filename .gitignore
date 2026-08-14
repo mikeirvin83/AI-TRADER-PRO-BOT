@@ -47,3 +47,9 @@ logs/
 .idea/
 .vscode/
 .DS_Store
+
+# Alembic auto-generated migration revisions (keep the template + placeholder)
+alembic/versions/*.py
+database/migrations/versions/*.py
+!database/migrations/versions/.gitkeep
+!database/migrations/script.py.mako
