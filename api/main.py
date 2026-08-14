@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import (
     account,
+    governance,
     positions,
     research,
     risk,
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(signals.router)
     app.include_router(risk.router)
     app.include_router(research.router)
+    app.include_router(governance.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:

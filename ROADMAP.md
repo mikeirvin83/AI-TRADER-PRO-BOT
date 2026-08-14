@@ -100,12 +100,47 @@ operational, promoted-to-live system.
 - ✅ Configurable alert manager (log + webhook channels, severity-aware).
 - ⬜ AuthN/Z on the API; dashboard UI; Prometheus metrics endpoint.
 
-### Phase 12 — Hardening & promotion ⬜
-- ⬜ Run in `PAPER` and meet promotion gates (`MIN_PAPER_TRADES`,
-  `MIN_PAPER_DURATION_DAYS`).
-- ⬜ Promote `PAPER → SHADOW`; validate shadow vs. live divergence.
-- ⬜ Operational runbooks, monitoring, and on-call alerting.
-- ⬜ Only then consider human-approved `SHADOW → LIVE`.
+### Phase 12 — Shadow trading ✅
+- ✅ `ShadowEngine` records intended orders without any broker connection and
+  reconciles each against the real achievable market price.
+- ✅ Divergence analytics: per-order price divergence, adverse slippage (bps),
+  observation latency, fill rate, and paper-vs-shadow realised P&L divergence.
+- ✅ `DivergenceReport.divergence_pct` takes the *worse* of price and P&L
+  divergence, and fails closed (1.0) when there is no evidence at all.
+- ✅ `ShadowTradingLoop` runs the pipeline against live data, mirrors intents
+  into a parallel paper book, and feeds metrics to the SHADOW promotion gate.
+- ✅ Loop refuses to start unless `TRADING_MODE` ∈ {PAPER, SHADOW, RESEARCH};
+  aborts every tick when emergency-stopped; trades only in REGULAR session.
+- ⬜ Accumulate real shadow-mode runtime evidence (requires live market data).
+
+### Phase 13 — Governance & human approval gates ✅
+- ✅ `governance/approval_registry.py` — append-only, auditable approval ledger.
+  Quorum-based: **both** a risk officer and the portfolio owner must sign off;
+  the `SYSTEM` role can veto but can never cast an approving vote.
+- ✅ Approvals expire (72h default), can be revoked at any time, and any single
+  rejection is terminal. Duplicate votes rejected.
+- ✅ `governance/risk_review.py` — 12-item RISK_REVIEW checklist: 7 automated
+  assertions evaluated from collected evidence + 5 manual human attestations.
+  Unanswered mandatory items block promotion (fails closed).
+- ✅ `governance/live_authorization.py` — deny-by-default gate requiring **all**
+  of: complete automated validation, passed risk review, valid multi-role human
+  approval, out-of-band `LIVE_TRADING_AUTHORIZED` env var, no emergency stop,
+  and a configured capital cap. Issues only time-boxed, capital-capped grants.
+- ✅ `/governance/*` API routes for approvals, votes, revocation, the risk
+  review checklist, the audit log, and live posture inspection.
+- ✅ `RUNBOOK.md` — operational runbook for daily ops, incidents and promotion.
+
+### Phase 14 — Live trading — NOT AUTHORIZED ⬜
+**Live trading is disabled and will stay disabled.** Everything below requires
+explicit human authorization that has not been given.
+- ⬜ Accumulate `PAPER` runtime meeting `MIN_PAPER_TRADES` /
+  `MIN_PAPER_DURATION_DAYS`.
+- ⬜ Accumulate `SHADOW` runtime with divergence inside the 10% gate.
+- ⬜ Complete a real RISK_REVIEW checklist with named human attesters.
+- ⬜ Obtain a real dual-role approval record.
+- ⬜ Set `LIVE_TRADING_AUTHORIZED` out of band and configure a capital cap.
+- ⬜ Live Alpaca order lifecycle hardening (partial fills, cancels, retries).
+- ⬜ API AuthN/Z and Prometheus metrics before any live exposure.
 
 ---
 
@@ -127,10 +162,15 @@ operational, promoted-to-live system.
 | News intelligence | ✅ complete (RSS + Alpaca + aggregator + pipeline) |
 | Paper trading loop | ✅ complete (end-to-end async runner) |
 | API & alerts | ✅ complete; auth/UI/metrics pending |
-| Promotion to live | ⬜ gated, not started |
+| Shadow trading | ✅ complete (engine + loop + divergence analytics) |
+| Governance & approvals | ✅ complete (registry + risk review + live gate) |
+| Live trading | ⬜ **NOT AUTHORIZED** — gate is deny-by-default |
 
-**Test suite:** 142 tests passing — unit + integration, no live broker or database.
+**Test suite:** 200 tests passing — unit + integration, no live broker or database.
 
-The platform is operationally complete for paper trading. The end-to-end
-loop wires all components together and runs autonomously. The ⬜ items are
-the path from paper trading to a safely promoted live system.
+The platform is operationally complete for paper trading and shadow trading, and
+the governance machinery that guards live capital is fully implemented and
+tested. Live trading remains disabled by default and cannot be enabled by code:
+it requires dual-role human sign-off plus an out-of-band operator environment
+variable. The remaining ⬜ items are runtime evidence accumulation and
+pre-live hardening.
