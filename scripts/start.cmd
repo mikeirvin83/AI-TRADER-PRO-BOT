@@ -35,7 +35,7 @@ if errorlevel 1 (
 
 echo.
 echo STEP 2: Opening a window for the trading API (port 8000)
-start "AI Trader API" cmd /k "cd /d "%ROOT%" ^&^& ".venv\Scripts\python.exe" -m uvicorn api.main:app --host 127.0.0.1 --port 8000"
+start "AI Trader API" cmd /k ""%~dp0_run_api.cmd""
 
 echo.
 echo STEP 3: Waiting for the API to answer (first start can take a minute)...
@@ -60,7 +60,7 @@ echo    API is up.
 
 echo.
 echo STEP 4: Opening a window for the paper trading loop
-start "AI Trader Paper Loop" cmd /k "cd /d "%ROOT%" ^&^& ".venv\Scripts\python.exe" run_paper.py"
+start "AI Trader Paper Loop" cmd /k ""%~dp0_run_paper.cmd""
 
 echo.
 echo STEP 5: Opening the API docs in your browser
