@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     ALPACA_SECRET_KEY: Optional[str] = Field(default=None)
     ALPACA_BASE_URL: str = Field(default="https://paper-api.alpaca.markets")
     ALPACA_DATA_URL: str = Field(default="https://data.alpaca.markets")
+    # Market data feed for stock bars. "iex" works on every plan (including
+    # free); "sip" requires a paid Alpaca data subscription.
+    STOCK_DATA_FEED: str = Field(default="iex")
 
     # ------------------------------------------------------------------ #
     # Infrastructure

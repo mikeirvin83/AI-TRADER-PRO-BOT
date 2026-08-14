@@ -20,6 +20,7 @@ from config.settings import get_settings
 log = get_logger(__name__)
 
 try:  # optional heavy dependency
+    from alpaca.data.enums import DataFeed
     from alpaca.data.historical import StockHistoricalDataClient, CryptoHistoricalDataClient
     from alpaca.data.requests import StockBarsRequest, CryptoBarsRequest
     from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
@@ -27,6 +28,7 @@ try:  # optional heavy dependency
     _ALPACA_SDK = True
 except Exception:  # noqa: BLE001
     _ALPACA_SDK = False
+    DataFeed = None  # type: ignore[assignment]
 
 
 _TF_MAP = {
@@ -145,7 +147,14 @@ class AlpacaClient:
             req = CryptoBarsRequest(symbol_or_symbols=symbol, timeframe=alp_tf, start=start, end=end)
             bars = _retry(lambda: self._crypto_data.get_crypto_bars(req))
         else:
-            req = StockBarsRequest(symbol_or_symbols=symbol, timeframe=alp_tf, start=start, end=end)
+            # Free Alpaca data plans cannot query recent SIP data; IEX is the
+            # feed available on every plan, so it is the default here. Override
+            # with STOCK_DATA_FEED=sip on a paid subscription.
+            feed_name = (get_settings().STOCK_DATA_FEED or "iex").lower()
+            feed = DataFeed.SIP if feed_name == "sip" else DataFeed.IEX
+            req = StockBarsRequest(
+                symbol_or_symbols=symbol, timeframe=alp_tf, start=start, end=end, feed=feed
+            )
             bars = _retry(lambda: self._stock_data.get_stock_bars(req))
 
         df = bars.df if hasattr(bars, "df") else pd.DataFrame()

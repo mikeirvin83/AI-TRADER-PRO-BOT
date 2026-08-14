@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import (
     account,
+    dashboard,
     governance,
     positions,
     research,
@@ -81,6 +82,8 @@ def create_app() -> FastAPI:
     app.include_router(risk.router)
     app.include_router(research.router)
     app.include_router(governance.router)
+    # Flat `/api/*` read model consumed by the operator dashboard.
+    app.include_router(dashboard.router)
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
