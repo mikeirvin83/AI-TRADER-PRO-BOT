@@ -68,9 +68,9 @@ echo $! > "$RUN_DIR/api.pid"
 echo "   pid $(cat "$RUN_DIR/api.pid")  log: $RUN_DIR/api.log"
 
 echo
-echo 'STEP 3: Waiting for the API to answer...'
+echo 'STEP 3: Waiting for the API to answer (first start can take a minute)...'
 UP=0
-for _ in $(seq 1 20); do
+for _ in $(seq 1 60); do
   sleep 2
   if curl -fsS -o /dev/null http://127.0.0.1:8000/health 2>/dev/null; then UP=1; break; fi
 done

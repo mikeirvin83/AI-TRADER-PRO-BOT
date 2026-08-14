@@ -49,19 +49,22 @@ Start-Process -FilePath 'cmd.exe' -ArgumentList @(
 )
 
 Write-Host ''
-Write-Host 'STEP 3: Waiting for the API to answer...' -ForegroundColor Yellow
+Write-Host 'STEP 3: Waiting for the API to answer (first start can take a minute)...' -ForegroundColor Yellow
 $up = $false
-for ($i = 1; $i -le 20; $i++) {
+for ($i = 1; $i -le 60; $i++) {
     Start-Sleep -Seconds 2
     try {
         $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -UseBasicParsing -TimeoutSec 3
         if ($r.StatusCode -eq 200) { $up = $true; break }
     } catch { }
+    Write-Host "   ...still loading ($i of 60)"
 }
 if ($up) {
     Write-Host '   API is up.' -ForegroundColor Green
 } else {
-    Write-Host '   API did not answer yet. Check the "AI Trader API" window for errors.' -ForegroundColor DarkYellow
+    Write-Host '   API still not answering after 2 minutes.' -ForegroundColor DarkYellow
+    Write-Host '   Look at the "AI Trader API" window - the last red lines say why.' -ForegroundColor DarkYellow
+    Write-Host '   Most common cause: Alpaca keys missing from the .env file.' -ForegroundColor DarkYellow
 }
 
 Write-Host ''

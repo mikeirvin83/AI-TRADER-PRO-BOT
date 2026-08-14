@@ -38,17 +38,21 @@ echo STEP 2: Opening a window for the trading API (port 8000)
 start "AI Trader API" cmd /k "cd /d "%ROOT%" ^&^& ".venv\Scripts\python.exe" -m uvicorn api.main:app --host 127.0.0.1 --port 8000"
 
 echo.
-echo STEP 3: Waiting for the API to answer...
+echo STEP 3: Waiting for the API to answer (first start can take a minute)...
 set "TRIES=0"
 :waitapi
 set /a TRIES+=1
 timeout /t 2 /nobreak >nul
 curl -s -o nul http://127.0.0.1:8000/health
 if not errorlevel 1 goto :apiup
-if %TRIES% GEQ 15 (
-  echo    API did not answer yet. Check the "AI Trader API" window for errors.
+if %TRIES% GEQ 60 (
+  echo.
+  echo    API still not answering after 2 minutes.
+  echo    Look at the "AI Trader API" window - the last red lines there say why.
+  echo    Most common cause: your Alpaca keys are missing from the .env file.
   goto :apidone
 )
+echo    ...still loading (%TRIES% of 60)
 goto :waitapi
 :apiup
 echo    API is up.
