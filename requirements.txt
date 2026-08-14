@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# Autonomous Adaptive Trading Intelligence Platform — runtime dependencies
+# Python 3.11+
+#
+# Grouped by role. The "core (imported)" block is required for the package to
+# import and for the test suite to run. The remaining blocks are needed at
+# runtime for live serving, persistence and broker connectivity.
+# ---------------------------------------------------------------------------
+
+# --- core (imported by the package + tests) ---
+numpy==2.2.1
+pandas==2.2.3
+pydantic==2.10.4
+pydantic-settings==2.7.1
+SQLAlchemy==2.0.36
+structlog==24.4.0
+fastapi==0.115.6
+httpx==0.28.1
+
+# --- web / API serving ---
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+
+# --- broker / market data (Alpaca) ---
+# SDK-optional: every Alpaca code path guards the import and degrades to a
+# no-op/paper path when the SDK or credentials are unavailable.
+alpaca-py==0.33.1
+websockets==14.1
+
+# --- persistence / infrastructure ---
+alembic==1.14.0
+psycopg2-binary==2.9.10
+redis==5.2.1
+
+# --- scientific / ML (regime, research, learning subsystems) ---
+scipy==1.15.0
+scikit-learn==1.6.0
+
+# --- observability ---
+prometheus-client==0.21.1
