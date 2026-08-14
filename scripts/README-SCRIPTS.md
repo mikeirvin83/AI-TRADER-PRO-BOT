@@ -139,7 +139,8 @@ An empty table means "nothing has happened yet", never "the feature is broken".
 
 | Symptom | Fix |
 |---|---|
-| `python not found` | Install Python 3.11+ and tick "Add python.exe to PATH" |
+| `python not found` | Install Python 3.12 and tick "Add python.exe to PATH" |
+| `ERROR: Compiler cl cannot compile programs` / `metadata-generation-failed` / Meson errors while installing numpy | Your Python is too new (3.14+). Install Python 3.12 from https://www.python.org/downloads/release/python-3129/ (tick "Add python.exe to PATH"), delete the `.venv` folder, then run setup again. Setup now checks this as step 1. |
 | `docker not found` / containers won't start | Open Docker Desktop and wait for "Running", then re-run setup |
 | Dashboard shows "sample data" | The API isn't reachable - check the "AI Trader API" window / `.run/api.log` |
 | Market prices are empty | Alpaca keys missing or wrong in `.env` |

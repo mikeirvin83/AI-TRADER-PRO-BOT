@@ -20,22 +20,38 @@ fail()   { echo; printf '=%.0s' {1..75}; echo; echo "  SETUP STOPPED at step $ST
 banner 'AI TRADER PRO - SETUP'
 echo "Project folder: $ROOT"
 
-step 'Checking that Python 3.11 or newer is installed'
+step 'Checking for a supported Python version (3.11, 3.12 or 3.13)'
+py_ok() {
+  command -v "$1" >/dev/null 2>&1 || return 1
+  "$1" -c 'import sys; sys.exit(0 if (3,11) <= sys.version_info < (3,14) else 1)' >/dev/null 2>&1
+}
 PY=""
-for c in python3.12 python3.11 python3 python; do
-  if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
+for c in python3.12 python3.11 python3.13 python3 python; do
+  if py_ok "$c"; then PY="$c"; break; fi
 done
-[ -n "$PY" ] || fail 'Python was not found. Install Python 3.11 or newer, then run this again.'
-echo "   Found: $($PY --version 2>&1)"
+if [ -z "$PY" ]; then
+  echo
+  echo '   NO SUPPORTED PYTHON VERSION WAS FOUND'
+  echo '   This platform needs Python 3.11, 3.12 or 3.13.'
+  echo '   Python 3.14+ has no ready-made builds for the maths packages yet, so'
+  echo '   pip would try to compile them from source and fail.'
+  echo '   Install python3.12 (or 3.11/3.13) and run this again.'
+  fail 'Install Python 3.11, 3.12 or 3.13 and run this script again.'
+fi
+echo "   Using: $($PY --version 2>&1)"
 ok
 
 step 'Creating the private Python environment (folder: .venv)'
-if [ -x "$ROOT/.venv/bin/python" ]; then
+VPY="$ROOT/.venv/bin/python"
+if [ -x "$VPY" ] && ! py_ok "$VPY"; then
+  echo '   The existing .venv was built with an unsupported Python - rebuilding.'
+  rm -rf "$ROOT/.venv"
+fi
+if [ -x "$VPY" ]; then
   echo '   Already exists - reusing it.'
 else
   "$PY" -m venv "$ROOT/.venv" || fail 'Could not create the virtual environment (try: sudo apt install python3-venv).'
 fi
-VPY="$ROOT/.venv/bin/python"
 ok
 
 step 'Upgrading pip'
@@ -43,12 +59,16 @@ step 'Upgrading pip'
 ok
 
 step 'Installing the platform packages (this can take a few minutes)'
-"$VPY" -m pip install -r "$ROOT/requirements.txt" || fail 'Package installation failed. Scroll up for the first error.'
+if ! "$VPY" -m pip install --prefer-binary -r "$ROOT/requirements.txt"; then
+  echo '   If the error mentions a compiler, Meson or "metadata-generation-failed",'
+  echo '   your Python version is too new. Use Python 3.12, delete .venv, re-run.'
+  fail 'Package installation failed. Scroll up for the first error.'
+fi
 ok
 
 step 'Installing the test/development packages'
 if [ -f "$ROOT/requirements-dev.txt" ]; then
-  "$VPY" -m pip install -r "$ROOT/requirements-dev.txt" || fail 'Dev package installation failed.'
+  "$VPY" -m pip install --prefer-binary -r "$ROOT/requirements-dev.txt" || fail 'Dev package installation failed.'
 else
   skip 'no requirements-dev.txt found.'
 fi

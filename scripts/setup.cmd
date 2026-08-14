@@ -16,15 +16,52 @@ echo Project folder: %ROOT%
 echo.
 
 REM ---------------------------------------------------------------- step 1 ---
-call :step "Checking that Python is installed"
-where py >nul 2>&1
-if %ERRORLEVEL%==0 (set "PYLAUNCH=py -3") else (set "PYLAUNCH=python")
-%PYLAUNCH% --version
-if errorlevel 1 (
+call :step "Checking for a supported Python version (3.11, 3.12 or 3.13)"
+set "PYLAUNCH="
+py -3.12 --version >nul 2>&1
+if not errorlevel 1 set "PYLAUNCH=py -3.12"
+if defined PYLAUNCH goto :havepy
+py -3.11 --version >nul 2>&1
+if not errorlevel 1 set "PYLAUNCH=py -3.11"
+if defined PYLAUNCH goto :havepy
+py -3.13 --version >nul 2>&1
+if not errorlevel 1 set "PYLAUNCH=py -3.13"
+if defined PYLAUNCH goto :havepy
+python --version >nul 2>&1
+if not errorlevel 1 set "PYLAUNCH=python"
+:havepy
+if not defined PYLAUNCH (
   echo.
   echo [X] Python was not found.
-  echo     Install Python 3.11 or newer from https://www.python.org/downloads/
+  echo     Install Python 3.12 from
+  echo     https://www.python.org/downloads/release/python-3129/
+  echo     Scroll to the bottom and click "Windows installer (64-bit)".
   echo     During install, TICK "Add python.exe to PATH", then run this file again.
+  goto :fail
+)
+%PYLAUNCH% --version
+REM Reject interpreters the scientific packages have no prebuilt wheels for.
+%PYLAUNCH% -c "import sys; sys.exit(0 if (3,11) <= sys.version_info < (3,14) else 1)"
+if errorlevel 1 (
+  echo.
+  echo ---------------------------------------------------------------------------
+  echo  [X] THIS PYTHON VERSION WILL NOT WORK
+  echo ---------------------------------------------------------------------------
+  echo  The version shown just above is either too old or too new. Packages such
+  echo  as numpy do not publish ready-made builds for it, so pip tries to COMPILE
+  echo  them from source and fails with "Compiler cl cannot compile programs".
+  echo.
+  echo  FIX - install Python 3.12 alongside what you already have:
+  echo    1. Open https://www.python.org/downloads/release/python-3129/
+  echo    2. Scroll to the bottom, click "Windows installer (64-bit)"
+  echo    3. Run it and TICK "Add python.exe to PATH" on the first screen
+  echo    4. Close this window, open a NEW cmd window, run this file again
+  echo.
+  echo  You do NOT need to uninstall your current Python - this script prefers
+  echo  3.12 automatically once it is installed.
+  echo.
+  echo  Then delete the half-built folder before retrying:
+  echo    rmdir /s /q "%ROOT%\.venv"
   goto :fail
 )
 call :ok
@@ -32,8 +69,17 @@ call :ok
 REM ---------------------------------------------------------------- step 2 ---
 call :step "Creating the private Python environment (folder: .venv)"
 if exist "%ROOT%\.venv\Scripts\python.exe" (
-  echo Already exists - reusing it.
-) else (
+  echo Found an existing .venv - checking it uses a supported Python...
+  "%ROOT%\.venv\Scripts\python.exe" -c "import sys; sys.exit(0 if (3,11) <= sys.version_info < (3,14) else 1)" >nul 2>&1
+  if errorlevel 1 (
+    echo Its Python is unsupported - rebuilding the environment from scratch.
+    rmdir /s /q "%ROOT%\.venv"
+  ) else (
+    echo Looks good - reusing it.
+  )
+)
+if not exist "%ROOT%\.venv\Scripts\python.exe" (
+  echo Creating a fresh environment...
   %PYLAUNCH% -m venv "%ROOT%\.venv"
   if errorlevel 1 goto :fail
 )
@@ -48,14 +94,21 @@ call :ok
 
 REM ---------------------------------------------------------------- step 4 ---
 call :step "Installing the platform packages (this can take a few minutes)"
-"%VPY%" -m pip install -r "%ROOT%\requirements.txt"
-if errorlevel 1 goto :fail
+REM --prefer-binary keeps pip on ready-made builds instead of compiling sources.
+"%VPY%" -m pip install --prefer-binary -r "%ROOT%\requirements.txt"
+if errorlevel 1 (
+  echo.
+  echo  If the error above mentions a compiler, Meson, or metadata-generation-failed,
+  echo  your Python version has no ready-made build for one of these packages.
+  echo  Install Python 3.12, delete the .venv folder, and run this file again.
+  goto :fail
+)
 call :ok
 
 REM ---------------------------------------------------------------- step 5 ---
 call :step "Installing the test/development packages"
 if exist "%ROOT%\requirements-dev.txt" (
-  "%VPY%" -m pip install -r "%ROOT%\requirements-dev.txt"
+  "%VPY%" -m pip install --prefer-binary -r "%ROOT%\requirements-dev.txt"
   if errorlevel 1 goto :fail
 ) else (
   echo No requirements-dev.txt found - skipping.

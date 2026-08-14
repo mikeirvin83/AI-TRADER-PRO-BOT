@@ -48,26 +48,57 @@ Write-Banner 'AI TRADER PRO - SETUP'
 Write-Host "Project folder: $Root"
 
 # ------------------------------------------------------------------ step 1 ---
-Write-Step 'Checking that Python 3.11 or newer is installed'
+Write-Step 'Checking for a supported Python version (3.11, 3.12 or 3.13)'
+
+function Test-PythonOk($exe, $exeArgs) {
+    if (-not (Get-Command $exe -ErrorAction SilentlyContinue)) { return $false }
+    & $exe @($exeArgs + @('-c', 'import sys; sys.exit(0 if (3,11) <= sys.version_info < (3,14) else 1)')) 2>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
 $pyExe = $null
-foreach ($candidate in @('py', 'python', 'python3')) {
-    $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
-    if ($cmd) { $pyExe = $candidate; break }
+$pyArgs = @()
+foreach ($try in @(@('py', @('-3.12')), @('py', @('-3.11')), @('py', @('-3.13')), @('python', @()), @('python3', @()))) {
+    if (Test-PythonOk $try[0] $try[1]) { $pyExe = $try[0]; $pyArgs = $try[1]; break }
 }
+
 if (-not $pyExe) {
-    Stop-Setup 'Python was not found. Install Python 3.11+ from https://www.python.org/downloads/ and tick "Add python.exe to PATH", then run this again.'
+    Write-Host ''
+    Write-Host '  ---------------------------------------------------------------' -ForegroundColor Red
+    Write-Host '   NO SUPPORTED PYTHON VERSION WAS FOUND' -ForegroundColor Red
+    Write-Host '  ---------------------------------------------------------------' -ForegroundColor Red
+    Write-Host '   This platform needs Python 3.11, 3.12 or 3.13.'
+    Write-Host '   Python 3.14 (and newer) does NOT work yet: the maths packages'
+    Write-Host '   have no ready-made build for it, so your PC would try to'
+    Write-Host '   compile them from source and fail with a compiler error.'
+    Write-Host ''
+    Write-Host '   WHAT TO DO (5 minutes):' -ForegroundColor Yellow
+    Write-Host '     1. Open https://www.python.org/downloads/release/python-3129/'
+    Write-Host '     2. Scroll to the bottom, click "Windows installer (64-bit)"'
+    Write-Host '     3. Run it and TICK "Add python.exe to PATH" on the first screen'
+    Write-Host '     4. You do NOT need to uninstall the Python you already have'
+    Write-Host '     5. Close this window, open a new one, and run this script again'
+    Write-Host ''
+    Stop-Setup 'Install Python 3.12 (link above) and run this script again.'
 }
-if ($pyExe -eq 'py') { $pyArgs = @('-3') } else { $pyArgs = @() }
+
 $verText = & $pyExe @($pyArgs + '--version') 2>&1
-Write-Host "   Found: $verText"
+Write-Host "   Using: $verText"
 Write-Ok
 
 # ------------------------------------------------------------------ step 2 ---
 Write-Step 'Creating the private Python environment (folder: .venv)'
 $venvPy = Join-Path $Root '.venv\Scripts\python.exe'
 if (Test-Path $venvPy) {
-    Write-Host '   Already exists - reusing it.'
-} else {
+    if (Test-PythonOk $venvPy @()) {
+        Write-Host '   Already exists - reusing it.'
+    } else {
+        Write-Host '   The existing .venv was built with an unsupported Python.' -ForegroundColor DarkYellow
+        Write-Host '   Deleting it and rebuilding with the good one...' -ForegroundColor DarkYellow
+        Remove-Item -Recurse -Force (Join-Path $Root '.venv')
+    }
+}
+if (-not (Test-Path $venvPy)) {
     & $pyExe @($pyArgs + @('-m', 'venv', (Join-Path $Root '.venv')))
     if (-not (Test-Path $venvPy)) { Stop-Setup 'The virtual environment was not created.' }
 }
@@ -81,15 +112,23 @@ Write-Ok
 
 # ------------------------------------------------------------------ step 4 ---
 Write-Step 'Installing the platform packages (this can take a few minutes)'
-& $venvPy -m pip install -r (Join-Path $Root 'requirements.txt')
-if ($LASTEXITCODE -ne 0) { Stop-Setup 'Package installation failed. Scroll up for the first red error.' }
+& $venvPy -m pip install --prefer-binary -r (Join-Path $Root 'requirements.txt')
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ''
+    Write-Host '   If the error above mentions a compiler, "cl", Meson, or' -ForegroundColor DarkYellow
+    Write-Host '   "metadata-generation-failed", your Python version is too new.' -ForegroundColor DarkYellow
+    Write-Host '   Install Python 3.12 from' -ForegroundColor DarkYellow
+    Write-Host '   https://www.python.org/downloads/release/python-3129/' -ForegroundColor DarkYellow
+    Write-Host '   then delete the .venv folder and run this script again.' -ForegroundColor DarkYellow
+    Stop-Setup 'Package installation failed. Scroll up for the first red error.'
+}
 Write-Ok
 
 # ------------------------------------------------------------------ step 5 ---
 Write-Step 'Installing the test/development packages'
 $devReq = Join-Path $Root 'requirements-dev.txt'
 if (Test-Path $devReq) {
-    & $venvPy -m pip install -r $devReq
+    & $venvPy -m pip install --prefer-binary -r $devReq
     if ($LASTEXITCODE -ne 0) { Stop-Setup 'Dev package installation failed.' }
 } else {
     Write-Skip 'no requirements-dev.txt found.'
